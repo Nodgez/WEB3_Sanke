@@ -16,6 +16,8 @@ using System.Threading.Tasks;
 using UnityEngine.Networking;
 using Unity.VisualScripting;
 using JetBrains.Annotations;
+using UnityEditor;
+using static System.Net.WebRequestMethods;
 
 public class MetamaskInterface : MonoBehaviour
 {
@@ -26,6 +28,7 @@ public class MetamaskInterface : MonoBehaviour
 
     [SerializeField]
     private string contractAddress = "0x71EAa691b6e5D5E75a3ebb36D4f87CBfb23C87b0";
+
     void Start()
     {
         var addr = new EvmAddress(contractAddress);
@@ -62,12 +65,18 @@ public class MetamaskInterface : MonoBehaviour
         print("Wallet Connected: " + metaMaskWallet.SelectedAddress);
     }
 
-    private async void TokenURITaskHandler(Task<string> task)
+    private async void TokenURITaskHandler(Task<BigInteger[]> task)
     {
         await task;
-        print(task.Result);
 
-        var url = task.Result.Replace("ipfs://", "https://ipfs.io/ipfs/");
+        var oddyIndices = task.Result;
+        if (oddyIndices.Length <= 1)
+            return;
+
+        var tokenURITask = todContract.TokenURI(oddyIndices.Last());
+        await tokenURITask;
+
+        var url = tokenURITask.Result.Replace("ipfs://", "https://ipfs.io/ipfs/");
         var request = UnityWebRequest.Get(url);
         await request.SendWebRequest();
         var metadata = System.Text.ASCIIEncoding.UTF8.GetString(request.downloadHandler.data);
@@ -80,23 +89,23 @@ public class MetamaskInterface : MonoBehaviour
 
         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshRenderer>();
         var texture = DownloadHandlerTexture.GetContent(pfpRequest);
-        quad.material.SetTexture("_MainTex", texture);
+        quad.material.SetTexture("_BaseMap", texture);
     }
 
     public void OnGUI()
     {
         if (metaMaskWallet.IsConnected)
         {
-            if (GUI.Button(new Rect(10, 10, 300, 300), "Get Token URI"))
+            if (GUI.Button(new Rect(10, 10, 100, 50), "Get Token URI"))
             {
-                TokenURITaskHandler(todContract.TokenURI(new BigInteger(3067)));
+                TokenURITaskHandler(todContract.TokensOfOwner(new EvmAddress(metaMaskWallet.ConnectedAddress)));
             }
         }
-
     }
 }
 
 [JsonObject]
+[Serializable]
 public class OddyMetadata
 {
     public string image;
@@ -107,6 +116,7 @@ public class OddyMetadata
 
 
 [JsonObject]
+[Serializable]
 public class OddyAttribute
 {
     public string trait_type;

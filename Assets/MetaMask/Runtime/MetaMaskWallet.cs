@@ -26,7 +26,8 @@ namespace MetaMask
         public const int AppIconMaxSize = 10_000;
         
         private static readonly JsonConverter[] Converters = {
-            new BigIntegerHexConverter()
+            new BigIntegerHexConverter(),
+            new BigIntegerArrayHexConverter()
         };
 
         #region Events
