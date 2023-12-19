@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: UnityUI
   m_EditorClassIdentifier: 
   spawnCanvas: 1
-  metaMaskCanvas: {fileID: 6439922646294248678, guid: c363ca23f1bd00f41b758192c96d8083, type: 3}
+  metaMaskCanvas: {fileID: 6439922646294248678, guid: 9e03dfd5b166cc246ae7bbe9c62d6baf, type: 3}
   useUniversalLinks: 0
