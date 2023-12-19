@@ -1,29 +1,20 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using System;
-using UnityEngine.SceneManagement;
 using MetaMask;
 using MetaMask.Unity;
-using MetaMask.Models;
 using Newtonsoft.Json;
-using System.Linq;
 using evm.net.Models;
 using evm.net;
 using Contracts;
 using System.Numerics;
 using System.Threading.Tasks;
 using UnityEngine.Networking;
-using Unity.VisualScripting;
-using JetBrains.Annotations;
+using UnityEngine.Windows;
 using UnityEditor;
-using static System.Net.WebRequestMethods;
 
 public class MetamaskInterface : MonoBehaviour
 {
     private MetaMaskWallet metaMaskWallet;
-
-    private string randomTokenId;
     private TOD721 todContract;
 
     [SerializeField]
@@ -65,31 +56,66 @@ public class MetamaskInterface : MonoBehaviour
         print("Wallet Connected: " + metaMaskWallet.SelectedAddress);
     }
 
+    /*The next step for this is to create a scriptable object Asset that will store the onchain metadata.
+     * This will speed up delivery as the app won't need to contact ipfs each time the app is opened and only to get new metadata
+     * I need to store the image somewhere as well
+     * They should be stored in a streaming assets folder so they can be accessed in other parts of the application
+    */
     private async void TokenURITaskHandler(Task<BigInteger[]> task)
     {
         await task;
 
-        var oddyIndices = task.Result;
-        if (oddyIndices.Length <= 1)
+        var tokenIds = task.Result;
+        if (tokenIds.Length <= 1)
             return;
+        for (int i = 2; i < tokenIds.Length; i++)
+        {
+            string pfpPath = $"{Application.persistentDataPath}/PFP/{tokenIds[i].ToString()}.jpg";
+            string jsonPath = $"{Application.persistentDataPath}/PFP/{tokenIds[i].ToString()}.json";
 
-        var tokenURITask = todContract.TokenURI(oddyIndices.Last());
-        await tokenURITask;
+            var localPFPRequest = UnityWebRequestTexture.GetTexture(pfpPath);
+            await localPFPRequest.SendWebRequest();
 
-        var url = tokenURITask.Result.Replace("ipfs://", "https://ipfs.io/ipfs/");
-        var request = UnityWebRequest.Get(url);
-        await request.SendWebRequest();
-        var metadata = System.Text.ASCIIEncoding.UTF8.GetString(request.downloadHandler.data);
-        print(metadata);
+            var localMetadataRequest = UnityWebRequest.Get(jsonPath);
+            await localMetadataRequest.SendWebRequest();
 
-        var oddy = JsonConvert.DeserializeObject<OddyMetadata>(metadata);
-        var imgUrl = oddy.image.Replace("ipfs://", "https://ipfs.io/ipfs/");
-        var pfpRequest = UnityWebRequestTexture.GetTexture(imgUrl);
-        await pfpRequest.SendWebRequest();
+            if (localPFPRequest.result != UnityWebRequest.Result.ProtocolError)
+            {
+                print($"Found Local Data");
+                var localTexture = DownloadHandlerTexture.GetContent(localPFPRequest);
+                var metadataText = localMetadataRequest.downloadHandler.text;
+                var metadataObj = JsonConvert.DeserializeObject(metadataText);
+                var q = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshRenderer>();
+                q.transform.Translate((UnityEngine.Vector3.right * i) - UnityEngine.Vector3.left * tokenIds.Length);
+                q.material.SetTexture("_BaseMap", localTexture);
+                continue;
+            }
 
-        var quad = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshRenderer>();
-        var texture = DownloadHandlerTexture.GetContent(pfpRequest);
-        quad.material.SetTexture("_BaseMap", texture);
+            var tokenURITask = todContract.TokenURI(tokenIds[i]);
+            await tokenURITask;
+
+            var url = tokenURITask.Result.Replace("ipfs://", "https://ipfs.io/ipfs/");
+            var request = UnityWebRequest.Get(url);
+            await request.SendWebRequest();
+            var metadata = System.Text.ASCIIEncoding.UTF8.GetString(request.downloadHandler.data);
+            print(metadata);
+
+            var oddy = JsonConvert.DeserializeObject<OddyMetadata>(metadata);
+            var imgUrl = oddy.image.Replace("ipfs://", "https://ipfs.io/ipfs/");
+            var pfpRequest = UnityWebRequestTexture.GetTexture(imgUrl);
+            await pfpRequest.SendWebRequest();
+
+            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshRenderer>();
+            quad.transform.Translate((UnityEngine.Vector3.right * i) - UnityEngine.Vector3.left * tokenIds.Length);
+            var texture = DownloadHandlerTexture.GetContent(pfpRequest);
+            quad.material.SetTexture("_BaseMap", texture);
+
+            if(!Directory.Exists($"{Application.persistentDataPath}/PFP"))
+                Directory.CreateDirectory($"{Application.persistentDataPath}/PFP");
+
+            File.WriteAllBytes(pfpPath, texture.EncodeToJPG());
+            System.IO.File.WriteAllText(jsonPath, metadata);
+        }
     }
 
     public void OnGUI()
@@ -112,6 +138,11 @@ public class OddyMetadata
     public string tokenId;
     public string name;
     public OddyAttribute[] attributes;
+
+    public override string ToString()
+    {
+        return $"{image}\n{tokenId}\n{name}";
+    }
 }
 
 
