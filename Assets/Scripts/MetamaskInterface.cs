@@ -12,6 +12,7 @@ using UnityEngine.Networking;
 using UnityEngine.Windows;
 using UnityEditor;
 using System.Collections.Generic;
+using UnityEngine.Events;
 
 public class MetamaskInterface : MonoBehaviour
 {
@@ -23,19 +24,48 @@ public class MetamaskInterface : MonoBehaviour
     [SerializeField]
     private string contractAddress = "0x71EAa691b6e5D5E75a3ebb36D4f87CBfb23C87b0";
 
+    public UnityAction OnNFTDownloadComplete;
+
+    static MetamaskInterface instance;
+
+    public static MetamaskInterface Instance
+    {
+        get { return instance; }
+    }
+
     void Start()
     {
-        var addr = new EvmAddress(contractAddress);
+        if (instance != null)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
 
+        instance = this;
         metaMaskWallet = MetaMaskUnity.Instance.Wallet;
-        todContract = Contract.Attach<TOD721>(metaMaskWallet, addr);
+        todContract = Contract.Attach<TOD721>(metaMaskWallet, new EvmAddress(contractAddress));
 
         metaMaskWallet.WalletConnectedHandler += OnWalletConnected;
         metaMaskWallet.WalletAuthorizedHandler += OnWalletAuthorized;
         metaMaskWallet.AccountChangedHandler += OnAccountChanged;
         metaMaskWallet.WalletDisconnectedHandler += OnWalletDisconnected;
+        metaMaskWallet.WalletReadyHandler += OnWalletReady;
         metaMaskWallet.EthereumRequestResultReceivedHandler += OnEthResultRecieved;
         metaMaskWallet.Connect();
+
+        DontDestroyOnLoad(this.gameObject);
+    }
+
+    private void OnWalletReady(object sender, EventArgs e)
+    {
+        var wallet = sender as MetaMaskWallet;
+        //Clear the saved data as a different account will have different NFT's
+        loadedPFP.Clear();
+        loadedMetadata.Clear();
+
+        //If the wallet is all good to get the data then get it
+        if (wallet.IsAuthorized && wallet.IsConnected)
+            TokenURITaskHandler();
     }
 
     private void OnWalletDisconnected(object sender, EventArgs e)
@@ -52,15 +82,12 @@ public class MetamaskInterface : MonoBehaviour
     private void OnAccountChanged(object sender, EventArgs e)
     {
         var wallet = sender as MetaMaskWallet;
-        print(wallet.IsAuthorized && wallet.IsConnected);
-        //print($"Wallet Account Changed: {sender.GetType()}");
     }
 
     private void OnWalletAuthorized(object sender, EventArgs e)
     {
         var wallet = sender as MetaMaskWallet;
         print("Wallet Authorized: " + wallet.SelectedAddress);
-        //SceneManager.LoadScene(1, LoadSceneMode.Single);
     }
 
     private void OnWalletConnected(object sender, EventArgs e)
@@ -71,6 +98,7 @@ public class MetamaskInterface : MonoBehaviour
 
     private async void TokenURITaskHandler()
     {
+        LoadingScreen.Instance.Show("Gathering Oddys");//Too Coupled but fine for now
         var getTokensTask = todContract.TokensOfOwner(new EvmAddress(metaMaskWallet.ConnectedAddress));
         await getTokensTask;
 
@@ -96,7 +124,10 @@ public class MetamaskInterface : MonoBehaviour
                 continue;
 
             await SearchIPFSForToken(pfpPath, jsonPath, tokenURITask);
+
         }
+        OnNFTDownloadComplete?.Invoke();
+        LoadingScreen.Instance.Hide();//Too Coulpled but fine for now
     }
 
     private async Task SearchIPFSForToken(string pfpPath, string jsonPath, Task<string> tokenURITask)
@@ -143,23 +174,26 @@ public class MetamaskInterface : MonoBehaviour
         return true;
     }
 
-    public void OnGUI()
-    {
-        if (metaMaskWallet.IsConnected)
-        {
-            if (GUI.Button(new Rect(10, 10, 100, 50), "Get Token URI"))
-            {
-                TokenURITaskHandler();
-            }
-        }
+    //public void OnGUI()
+    //{
+    //    if (metaMaskWallet.IsConnected)
+    //    {
+    //        if (GUI.Button(new Rect(10, 10, 100, 50), "Get Token URI"))
+    //        {
+    //            TokenURITaskHandler();
+    //        }
+    //    }
 
-        GUI.BeginGroup(new Rect(Screen.width - 200, 10, 180, 300));
-        GUILayout.Label($"Authorized:  {metaMaskWallet.IsAuthorized}");
-        GUILayout.Label($"Connected:  {metaMaskWallet.IsConnected}");
-        GUILayout.Label($"Paused:  {metaMaskWallet.IsPaused}");
-        GUILayout.Label($"Chain ID:  {metaMaskWallet.ChainId}");
-        GUI.EndGroup();
-    }
+    //    GUI.BeginGroup(new Rect(Screen.width - 200, 10, 180, 300));
+    //    GUILayout.Label($"Authorized:  {metaMaskWallet.IsAuthorized}");
+    //    if (metaMaskWallet.Connecting)
+    //        GUILayout.Label($"Connecting......");
+    //    else
+    //        GUILayout.Label($"Connected:  {metaMaskWallet.IsConnected}");
+    //    GUILayout.Label($"Paused:  {metaMaskWallet.IsPaused}");
+    //    GUILayout.Label($"Chain ID:  {metaMaskWallet.ChainId}");
+    //    GUI.EndGroup();
+    //}
 }
 
 [JsonObject]
