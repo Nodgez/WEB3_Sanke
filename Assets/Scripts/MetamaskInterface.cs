@@ -14,10 +14,12 @@ using UnityEditor;
 using System.Collections.Generic;
 using UnityEngine.Events;
 
+//This object's purpose is to handle interaction with the metamask wallet and manage the relevant data
 public class MetamaskInterface : MonoBehaviour
 {
     private Dictionary<string, OddyMetadata> loadedMetadata = new Dictionary<string, OddyMetadata>();
     private Dictionary<string, Texture2D> loadedPFP = new Dictionary<string, Texture2D>();
+    private BigInteger[] tokenIds;
     private MetaMaskWallet metaMaskWallet;
     private TOD721 todContract;
 
@@ -45,13 +47,12 @@ public class MetamaskInterface : MonoBehaviour
         metaMaskWallet = MetaMaskUnity.Instance.Wallet;
         todContract = Contract.Attach<TOD721>(metaMaskWallet, new EvmAddress(contractAddress));
 
-        metaMaskWallet.WalletConnectedHandler += OnWalletConnected;
+        metaMaskWallet.WalletConnectedHandler += OnWalletConnected; 
         metaMaskWallet.WalletAuthorizedHandler += OnWalletAuthorized;
         metaMaskWallet.AccountChangedHandler += OnAccountChanged;
         metaMaskWallet.WalletDisconnectedHandler += OnWalletDisconnected;
         metaMaskWallet.WalletReadyHandler += OnWalletReady;
         metaMaskWallet.EthereumRequestResultReceivedHandler += OnEthResultRecieved;
-        metaMaskWallet.Connect();
 
         DontDestroyOnLoad(this.gameObject);
     }
@@ -63,8 +64,13 @@ public class MetamaskInterface : MonoBehaviour
         loadedPFP.Clear();
         loadedMetadata.Clear();
 
+        RefreshTokens();
+    }
+
+    public void RefreshTokens()
+    {
         //If the wallet is all good to get the data then get it
-        if (wallet.IsAuthorized && wallet.IsConnected)
+        if (metaMaskWallet.IsAuthorized && metaMaskWallet.IsConnected)
             TokenURITaskHandler();
     }
 
@@ -102,7 +108,7 @@ public class MetamaskInterface : MonoBehaviour
         var getTokensTask = todContract.TokensOfOwner(new EvmAddress(metaMaskWallet.ConnectedAddress));
         await getTokensTask;
 
-        var tokenIds = getTokensTask.Result;
+        tokenIds = getTokensTask.Result;
 
         //No Tokens in the wallet then return
         if (tokenIds.Length <= 1)
@@ -172,6 +178,18 @@ public class MetamaskInterface : MonoBehaviour
         loadedMetadata.Add(metadata.tokenId, metadata);
         loadedPFP.Add(metadata.tokenId, pfpTexture);
         return true;
+    }
+
+    public Texture2D GetRandomPFP()
+    { 
+        var randomTokenId = tokenIds[UnityEngine.Random.Range(0, tokenIds.Length)];
+        var key = randomTokenId.ToString();
+        return loadedPFP[key];
+    }
+
+    public void ConnectWallet()
+    { 
+        this.metaMaskWallet.Connect();
     }
 
     //public void OnGUI()

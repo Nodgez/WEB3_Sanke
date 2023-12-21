@@ -108,6 +108,9 @@ public class Snake : MonoBehaviour
     void AddToTail(Vector2Int position)
     {
         var newSegement = Instantiate(snakeProtoType, this.transform);
+        var sprRenderer = newSegement.GetComponent<SpriteRenderer>();
+
+        sprRenderer.sprite = Sprite.Create(null, new Rect(0, 0, 2000, 3000), Vector2.one * 0.5f);
         snakeSegmentChain.AddLast(new SnakeSegment(position, newSegement));
     }
 }
