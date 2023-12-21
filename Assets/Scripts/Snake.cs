@@ -110,7 +110,7 @@ public class Snake : MonoBehaviour
         var newSegement = Instantiate(snakeProtoType, this.transform);
         var sprRenderer = newSegement.GetComponent<SpriteRenderer>();
 
-        sprRenderer.sprite = Sprite.Create(null, new Rect(0, 0, 2000, 3000), Vector2.one * 0.5f);
+        sprRenderer.sprite = Sprite.Create(MetamaskInterface.Instance.GetPFP(snakeSegmentChain.Count), new Rect(0, 0, 2000, 3000), Vector2.one * 0.5f, 2500f);
         snakeSegmentChain.AddLast(new SnakeSegment(position, newSegement));
     }
 }

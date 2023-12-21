@@ -13,6 +13,7 @@ using UnityEngine.Windows;
 using UnityEditor;
 using System.Collections.Generic;
 using UnityEngine.Events;
+using UnityEngine.UI;
 
 //This object's purpose is to handle interaction with the metamask wallet and manage the relevant data
 public class MetamaskInterface : MonoBehaviour
@@ -182,7 +183,15 @@ public class MetamaskInterface : MonoBehaviour
 
     public Texture2D GetRandomPFP()
     { 
-        var randomTokenId = tokenIds[UnityEngine.Random.Range(0, tokenIds.Length)];
+        var randomTokenId = tokenIds[UnityEngine.Random.Range(2, tokenIds.Length)];
+        var key = randomTokenId.ToString();
+        return loadedPFP[key];
+    }
+
+    public Texture2D GetPFP(int num)
+    {
+        var val = num % (tokenIds.Length - 2);
+        var randomTokenId = tokenIds[val + 2];
         var key = randomTokenId.ToString();
         return loadedPFP[key];
     }
